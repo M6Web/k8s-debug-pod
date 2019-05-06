@@ -1,5 +1,10 @@
-box/busybox
-box/toybox
-box/curl
-box/cacert.pem
+/box
+!/box/bind.LICENSE
+!/box/busybox.LICENSE
+!/box/curl.LICENSE
+!/box/install-k8s-debugbox.sh
+!/box/sh
+!/box/toybox.LICENSE
+!/box/uninstall-k8s-debugbox.sh
+!/box/vim.LICENSE
 releases

@@ -1,0 +1,5 @@
+.git/
+/box
+!/box/sh
+!/box/install-k8s-debugbox.sh
+!/box/uninstall-k8s-debugbox.sh

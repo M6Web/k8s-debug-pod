@@ -7,6 +7,7 @@ It works by copying statically linked tools, including a shell, into the pods yo
 
 Kubernetes cluster:
 * k8s-debugbox has no special requirements towards Kubernetes clusters
+* docker runtime if you want to debug a pod, debugging a controller works with any runtime
 
 Client:
 * Bash 3 or later
@@ -16,7 +17,7 @@ Most modern operating systems already come with Bash 3 or later. However on Wind
 
 ## Installation
 
-1. Download a [k8s-debugbox release](https://github.com/puzzle/k8s-debugbox/releases)
+1. Download a [k8s-debugbox release](https://github.com/meroje/k8s-debugbox/releases)
 2. Extract the downloaded file
 3. Change into the created directory
 4. Run `install.sh` (`install.bat` on Windows)
@@ -60,7 +61,7 @@ Examples:
 Options:
   -n, --namespace='': Namespace which contains the pod to debug, defaults to the namespace of the current kubectl context
   -c, --container='': Container name to open shell for, defaults to first container in pod
-  -i, --image='puzzle/k8s-debugbox': Docker image for installation of debugging via controller. Must be built from 'puzzle/k8s-debugbox' repository.
+  -i, --image='meroje/k8s-debugbox': Docker image for installation of debugging via controller. Must be built from 'meroje/k8s-debugbox' repository.
   -h, --help: Show this help message
       --add: Install debugging tools into specified resource
       --remove: Remove debugging tools from specified resource
@@ -73,4 +74,4 @@ A redeployment is necessary if you install the debugging tools into a controller
 
 ## Developing
 
-To start developing on k8s-debugbox itself you just have to clone the [k8s-debugbox repository](https://github.com/puzzle/k8s-debugbox), enter the created directory and run the `bootstrap.sh` script, which will download the statically compiled debugging tools using curl.
+To start developing on k8s-debug-pod itself you just have to clone the [k8s-debug-pod repository](https://github.com/m6web/k8s-debug-pod), enter the created directory and run `docker build`, which will make a new image containing the debugging tools.

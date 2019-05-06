@@ -78,7 +78,7 @@ parse_cmdline() {
   add_opt=false
   remove_opt=false
   container_opt=""
-  image_opt="puzzle/k8s-debugbox"
+  image_opt="meroje/k8s-debugbox"
   namespace_opt=""
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -131,6 +131,10 @@ parse_cmdline() {
 
 install_into_pod() {
   if ! ${kubectl} exec ${namespace_opt} ${container_opt} "${name_arg}" ${pod_debugbox_dir}/bin/true >/dev/null 2>&1; then
+    echo "Extracting debugging tools from ${image_opt}"
+    ct=$(docker create "${image_opt}")
+    docker cp "${ct}:/usr/local/k8s-debugbox/box/." "${debugbox_dir}"
+    docker rm "${ct}"
     echo "Uploading debugging tools into ${type_arg} ${name_arg}"
     ${kubectl} cp ${namespace_opt} ${container_opt} ${debugbox_dir} "${name_arg}":/tmp/
     if [ $? != 0 ]; then
@@ -162,10 +166,10 @@ install_into_controller() {
   containers=$(${kubectl} get ${namespace_opt} "${type_arg}" "${name_arg}" -o jsonpath='{.spec.template.spec.containers[*].name}')
 
   annotations=($(${kubectl} get ${namespace_opt} "${type_arg}" "${name_arg}" -o go-template='{{range $key, $value := .spec.template.metadata.annotations}}{{$key}}{{"\n"}}{{end}}'))
-  if [[ " ${annotations[@]} " =~ " pod.alpha.kubernetes.io/init-containers " ]]; then
+  if [[ " ${annotations[*]} " =~ pod.alpha.kubernetes.io/init-containers ]]; then
     alpha_init_containers_annotation=true
   fi
-  if [[ " ${annotations[@]} " =~ " pod.beta.kubernetes.io/init-containers " ]]; then
+  if [[ " ${annotations[*]} " =~ pod.beta.kubernetes.io/init-containers ]]; then
     beta_init_containers_annotation=true
   fi
 
