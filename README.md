@@ -3,6 +3,10 @@
 k8s-debug-pod is a tool for debugging Kubernetes pods based on minimal images.
 It works by copying statically linked tools, including a shell, into the pods you want to debug.
 
+## Acknowledgment
+
+This tool is a modification of https://github.com/puzzle/k8s-debugbox published under GPL. We're changing the content of the debug rootfs and improving the injection process for specified pod.
+
 ## Requirements
 
 Kubernetes cluster:
