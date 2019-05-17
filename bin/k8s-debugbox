@@ -93,10 +93,12 @@ parse_cmdline() {
         ;;
       -c|--container)
         shift
-        container_opt="--container=${1}"
+        container_name="${1}"
+        container_opt="--container=${container_name}"
         ;;
       --container=*)
-        container_opt="--container=${1#*=}"
+        container_name="${1#*=}"
+        container_opt="--container=${container_name}"
         ;;
       -i|--image)
         shift
@@ -131,15 +133,89 @@ parse_cmdline() {
 
 install_into_pod() {
   if ! ${kubectl} exec ${namespace_opt} ${container_opt} "${name_arg}" ${pod_debugbox_dir}/bin/true >/dev/null 2>&1; then
-    echo "Extracting debugging tools from ${image_opt}"
-    ct=$(docker create "${image_opt}")
-    docker cp "${ct}:/usr/local/k8s-debugbox/box/." "${debugbox_dir}"
-    docker rm "${ct}"
-    echo "Uploading debugging tools into ${type_arg} ${name_arg}"
-    ${kubectl} cp ${namespace_opt} ${container_opt} ${debugbox_dir} "${name_arg}":/tmp/
-    if [ $? != 0 ]; then
+    
+    container_id=$(${kubectl} get ${namespace_opt} "${type_arg}" "${name_arg}" -o jsonpath="{.status.containerStatuses[?(@.name==\"${container_name}\")].containerID}")
+    runtime=${container_id%://*}
+    container_id=${container_id#*://}
+    node=$(${kubectl} get ${namespace_opt} "${type_arg}" "${name_arg}" -o jsonpath='{.spec.nodeName}')
+
+    if [[ ${runtime} != docker ]]; then
+      echo >&2 "Error: $0 only works with a docker runtime. Found: ${container_id}"
+      exit 1
+    fi
+
+    DOCKER_DOWNLOAD_URL="${DOCKER_DOWNLOAD_URL:-https://download.docker.com/linux/static/stable/x86_64/docker-17.12.0-ce.tgz}"
+    docker="/docker-cli/docker/docker -H unix:///mnt/docker.sock"
+
+    # Command for installing busybox image from the debugger container into the target container.
+    copy_cmd="set -x; mkdir /docker-cli;" # Print commands, for debugging.
+    # Download docker client
+    copy_cmd="${copy_cmd} wget -qO/docker-cli/docker.tgz ${DOCKER_DOWNLOAD_URL}"
+    # Extract docker client
+    copy_cmd="${copy_cmd} && tar zxvf /docker-cli/docker.tgz -C /docker-cli"
+    # Copy the directory structure into the target container.
+    #copy_cmd="${copy_cmd} && ${docker} cp /usr/local/k8s-debugbox ${container_id}:/${pod_debugbox_dir}"
+    copy_cmd="${copy_cmd} && tar -C /usr/local/k8s-debugbox -f- -c box | ${docker} exec -i ${container_id} tar -C $(dirname ${pod_debugbox_dir}) -xf-"
+
+    manifest=(
+      "---"
+      "apiVersion: v1"
+      "kind: Pod"
+      "metadata:"
+      "  generateName: k8s-debugbox-"
+      "spec:"
+      "  nodeName:    ${node}"
+      "  restartPolicy: Never"
+      "  containers:"
+      "    - name: k8s-debugbox"
+      "      image: ${image_opt}"
+      "      imagePullPolicy: Always"
+      "      securityContext:"
+      "        privileged: true"
+      "      command:"
+      "        - sh"
+      "        - -c"
+      "        - \"${copy_cmd}\""
+      "      # Mount the node FS for direct access to docker."
+      "      volumeMounts:"
+      "        - name: docker-sock"
+      "          mountPath: /mnt/docker.sock"
+      "          readOnly: true"
+      "  volumes:"
+      "    - name: docker-sock"
+      "      hostPath:"
+      "        path: /var/run/docker.sock"
+    )
+    manifest="$(printf '%s\n' "${manifest[@]}")" # convert manifest to string
+
+    injecter_name=$(${kubectl} create -o name -f - <<<"${manifest}")
+    injecter_name=${injecter_name#pod/} # Remove pod/ prefix from name
+
+    # Cleanup the debugger pod.
+    function cleanup() {
+      if ${kubectl} get pod ${injecter_name} &>/dev/null; then
+        ${kubectl} delete pod ${injecter_name}
+      fi
+    }
+    trap cleanup EXIT
+
+    # Wait for the pod to terminate.
+    phase=$(${kubectl} get ${namespace_opt} pod ${injecter_name} -o jsonpath='{.status.phase}')
+    while [[ ! ${phase} =~ (Succeeded|Failed) ]]; do
+      echo "waiting for debugger pod to complete (currently ${phase})..."
+      sleep 1
+      phase=$(${kubectl} get ${namespace_opt} pod ${injecter_name} -o jsonpath='{.status.phase}')
+    done
+    if [[ ${phase} == "Failed" ]]; then
+      echo 2> "Pod failed:"
+      ${kubectl} logs ${injecter_name}
+    fi
+
+    cleanup
+
+    if [[ ${phase} == "Failed" ]]; then
       echo >&2
-      echo "Couldn't upload debugging tools!" >&2
+      echo "Couldn't inject debugging tools!" >&2
       echo "Instead you can patch the controller (deployment, deploymentconfig, daemonset, ...) to use an init container with debugging tools, this requires a new deployment though!" >&2
       exit 1
     fi
