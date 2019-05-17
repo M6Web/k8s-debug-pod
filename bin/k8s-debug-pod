@@ -1,6 +1,6 @@
 #!/bin/bash
 
-debugbox_dir=${HOME}/.k8s-debugbox/box
+debugbox_dir=${HOME}/.k8s-debug-pod/box
 pod_debugbox_dir=/tmp/box  # Use // to prevent MSYS path translation
 
 usage() {
@@ -12,37 +12,37 @@ usage() {
     "Examples:"
     "  # Open debugging shell for the first container of the specified pod,"
     "  # install debugging tools into the container if they aren't installed yet."
-    "  k8s-debugbox pod hello-42-dmj88"
+    "  k8s-debug-pod pod hello-42-dmj88"
     ""
     "  # Open debugging shell for container 'proxy' of the specified pod,"
     "  # install debugging tools into the container if they aren't installed yet."
-    "  k8s-debugbox pod hello-42-dmj88 -c proxy"
+    "  k8s-debug-pod pod hello-42-dmj88 -c proxy"
     ""
     "  # Install debugging tools into specified pod."
-    "  k8s-debugbox pod hello-42-dmj88 --add"
+    "  k8s-debug-pod pod hello-42-dmj88 --add"
     ""
     "  # Uninstall debugging tools from specified pod."
-    "  k8s-debugbox pod hello-42-dmj88 --remove"
+    "  k8s-debug-pod pod hello-42-dmj88 --remove"
     ""
     "  # Open debugging shell for the first container of the first pod of the specified controller,"
     "  # install debugging tools into all containers of the controller if they aren't installed yet."
     "  # Requires a redeployment."
-    "  k8s-debugbox deployment hello"
+    "  k8s-debug-pod deployment hello"
     ""
     "  # Open debugging shell for the first container of the first pod of the specified controller,"
     "  # install debugging tools into all containers of the controller if they aren't installed yet."
     "  # Uses the specified Docker image for tool installation instead of the default one."
     "  # Requires a redeployment."
-    "  k8s-debugbox deployment hello -i example.org/tools/k8s-debugbox"
+    "  k8s-debug-pod deployment hello -i example.org/tools/k8s-debug-pod"
     ""
     "  # Uninstall debugging tools from specified controller."
     "  # Requires a redeployment."
-    "  k8s-debugbox deployment hello --remove"
+    "  k8s-debug-pod deployment hello --remove"
     ""
     "Options:"
     "  -n, --namespace='': Namespace which contains the pod to debug, defaults to the namespace of the current kubectl context"
     "  -c, --container='': Container name to open shell for, defaults to first container in pod"
-    "  -i, --image='puzzle/k8s-debugbox': Docker image for installation of debugging via controller. Must be built from 'puzzle/k8s-debugbox' repository."
+    "  -i, --image='puzzle/k8s-debug-pod': Docker image for installation of debugging via controller. Must be built from 'puzzle/k8s-debug-pod' repository."
     "  -h, --help: Show this help message"
     "      --add: Install debugging tools into specified resource"
     "      --remove: Remove debugging tools from specified resource"
@@ -78,7 +78,7 @@ parse_cmdline() {
   add_opt=false
   remove_opt=false
   container_opt=""
-  image_opt="meroje/k8s-debugbox"
+  image_opt="m6web/k8s-debug-pod"
   namespace_opt=""
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -154,20 +154,20 @@ install_into_pod() {
     # Extract docker client
     copy_cmd="${copy_cmd} && tar zxvf /docker-cli/docker.tgz -C /docker-cli"
     # Copy the directory structure into the target container.
-    #copy_cmd="${copy_cmd} && ${docker} cp /usr/local/k8s-debugbox ${container_id}:/${pod_debugbox_dir}"
-    copy_cmd="${copy_cmd} && tar -C /usr/local/k8s-debugbox -f- -c box | ${docker} exec -i ${container_id} tar -C $(dirname ${pod_debugbox_dir}) -xf-"
+    #copy_cmd="${copy_cmd} && ${docker} cp /usr/local/k8s-debug-pod ${container_id}:/${pod_debugbox_dir}"
+    copy_cmd="${copy_cmd} && tar -C /usr/local/k8s-debug-pod -f- -c box | ${docker} exec -i ${container_id} tar -C $(dirname ${pod_debugbox_dir}) -xf-"
 
     manifest=(
       "---"
       "apiVersion: v1"
       "kind: Pod"
       "metadata:"
-      "  generateName: k8s-debugbox-"
+      "  generateName: k8s-debug-pod-"
       "spec:"
       "  nodeName:    ${node}"
       "  restartPolicy: Never"
       "  containers:"
-      "    - name: k8s-debugbox"
+      "    - name: k8s-debug-pod"
       "      image: ${image_opt}"
       "      imagePullPolicy: Always"
       "      securityContext:"
@@ -220,7 +220,7 @@ install_into_pod() {
       exit 1
     fi
 
-    ${kubectl} exec ${namespace_opt} ${container_opt} "${name_arg}" ${pod_debugbox_dir}/install-k8s-debugbox.sh || exit 1
+    ${kubectl} exec ${namespace_opt} ${container_opt} "${name_arg}" ${pod_debugbox_dir}/install-k8s-debug-pod.sh || exit 1
   fi
 
   if [ "${add_opt}" != true ]; then
@@ -229,9 +229,9 @@ install_into_pod() {
 }
 
 remove_from_pod() {
-  if ${kubectl} exec ${namespace_opt} "${name_arg}" -- ${pod_debugbox_dir}/bin/test -e ${pod_debugbox_dir}/uninstall-k8s-debugbox.sh >/dev/null 2>&1; then
+  if ${kubectl} exec ${namespace_opt} "${name_arg}" -- ${pod_debugbox_dir}/bin/test -e ${pod_debugbox_dir}/uninstall-k8s-debug-pod.sh >/dev/null 2>&1; then
     echo "Removing debugging tools from ${type_arg} ${name_arg}"
-    ${kubectl} exec ${namespace_opt} ${container_opt} "${name_arg}" ${pod_debugbox_dir}/uninstall-k8s-debugbox.sh || exit 1
+    ${kubectl} exec ${namespace_opt} ${container_opt} "${name_arg}" ${pod_debugbox_dir}/uninstall-k8s-debug-pod.sh || exit 1
   else
     echo "No debugging tools are installed in ${type_arg} '${name_arg}' with 'kubectl cp' mechanism!"
   fi
@@ -274,14 +274,14 @@ install_into_controller() {
   patch+=(
     "    spec:"
     "      volumes:"
-    "      - name: k8s-debugbox"
+    "      - name: k8s-debug-pod"
     "        emptyDir: {}"
     "      initContainers:"
-    "      - name: k8s-debugbox"
+    "      - name: k8s-debug-pod"
     "        image: ${image_opt}"
     "        imagePullPolicy: Always"
     "        volumeMounts:"
-    "        - name: k8s-debugbox"
+    "        - name: k8s-debug-pod"
     "          mountPath: ${pod_debugbox_dir}"
     "      containers:"
   )
@@ -290,7 +290,7 @@ install_into_controller() {
     patch+=(
       "      - name: ${container}"
       "        volumeMounts:"
-      "        - name: k8s-debugbox"
+      "        - name: k8s-debug-pod"
       "          mountPath: ${pod_debugbox_dir}"
     )
   done
@@ -308,7 +308,7 @@ install_into_controller() {
 }
 
 remove_from_controller() {
-  installed=$(${kubectl} get ${namespace_opt} ${type_arg} ${name_arg} -o jsonpath='{.spec.template.spec.volumes[?(@.name=="k8s-debugbox")].name}')
+  installed=$(${kubectl} get ${namespace_opt} ${type_arg} ${name_arg} -o jsonpath='{.spec.template.spec.volumes[?(@.name=="k8s-debug-pod")].name}')
   if [ ! "${installed}" ]; then
     echo "No debugging tools installed in ${type_arg} ${name_arg}"
     exit 0
@@ -327,10 +327,10 @@ remove_from_controller() {
     "    spec:"
     "      volumes:"
     "      - \$patch: delete"
-    "        name: k8s-debugbox"
+    "        name: k8s-debug-pod"
     "      initContainers:"
     "      - \$patch: delete"
-    "        name: k8s-debugbox"
+    "        name: k8s-debug-pod"
     "      containers:"
   )
 

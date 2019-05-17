@@ -1,7 +1,7 @@
 #!/bin/sh
 
-if [ ! -e bin/k8s-debugbox ]; then
-    echo "'$(basename "$0")' must be run in 'k8s-debugbox' directory!" >&2
+if [ ! -e bin/k8s-debug-pod ]; then
+    echo "'$(basename "$0")' must be run in 'k8s-debug-pod' directory!" >&2
     exit 1
 fi
 

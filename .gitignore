@@ -1,10 +1,6 @@
-/box
-!/box/bind.LICENSE
-!/box/busybox.LICENSE
-!/box/curl.LICENSE
-!/box/install-k8s-debugbox.sh
-!/box/sh
-!/box/toybox.LICENSE
-!/box/uninstall-k8s-debugbox.sh
-!/box/vim.LICENSE
+box/*
+!box/sh
+!box/*.LICENSE
+!box/install-k8s-debug-pod.sh
+!box/uninstall-k8s-debug-pod.sh
 releases
