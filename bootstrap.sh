@@ -14,6 +14,10 @@ echo "Downloading static bind binary:"
 ./box/static-get -d box -v -x bind
 
 echo
+echo "Downloading static mtr binary:"
+./box/static-get -d box -v -x mtr
+
+echo
 echo "Downloading static busybox binary:"
 curl -Lo box/busybox https://busybox.net/downloads/binaries/1.28.1-defconfig-multiarch/busybox-x86_64
 chmod +x box/busybox
